@@ -9,7 +9,6 @@ import {
   ShieldCheck,
   AlertTriangle,
   ShieldAlert,
-  Activity,
   Power,
   BellRing,
   BellOff,
@@ -18,7 +17,7 @@ import {
 
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"] });
 
-// --- Definisi Tipe Data ---
+// --- Definisi Tipe Data Sesuai Laporan ---
 interface DataSungai {
   level: number;
   status: "AMAN" | "SIAGA" | "BAHAYA" | "MENUNGGU DATA...";
@@ -38,13 +37,9 @@ interface LogEntry {
   wilayah: string;
 }
 
-type KondisiHujan = "CERAH" | "GERIMIS" | "DERAS" | "MENUNGGU DATA...";
-type StatusWilayah =
-  | "AMAN"
-  | "SIAGA"
-  | "BAHAYA"
-  | "DARURAT"
-  | "MENYAMBUNGKAN...";
+type KondisiHujan = "CERAH" | "GERIMIS" | "HUJAN DERAS" | "MENUNGGU DATA...";
+// Status disesuaikan menjadi 3 tingkatan sesuai laporan
+type StatusWilayah = "AMAN" | "SIAGA" | "BAHAYA" | "MENYAMBUNGKAN...";
 
 export default function DashboardKelurahan() {
   const [nodeSungai, setNodeSungai] = useState<DataSungai>({
@@ -66,6 +61,7 @@ export default function DashboardKelurahan() {
   const [isConnected, setIsConnected] = useState(false);
   const prevStatusRef = useRef<StatusWilayah>("MENYAMBUNGKAN...");
 
+  // --- Logika Penentuan Status Wilayah ---
   const hitungStatusWilayah = (
     sungaiStatus: string,
     kondisiHujan: string,
@@ -75,13 +71,14 @@ export default function DashboardKelurahan() {
       kondisiHujan === "MENUNGGU DATA..."
     )
       return "MENYAMBUNGKAN...";
-    if (sungaiStatus === "BAHAYA" && kondisiHujan === "DERAS") return "DARURAT";
+
+    // Level Tertinggi adalah BAHAYA
     if (
       sungaiStatus === "BAHAYA" ||
-      (sungaiStatus === "SIAGA" && kondisiHujan === "DERAS")
+      (sungaiStatus === "SIAGA" && kondisiHujan === "HUJAN DERAS")
     )
       return "BAHAYA";
-    if (sungaiStatus === "SIAGA" || kondisiHujan === "DERAS") return "SIAGA";
+    if (sungaiStatus === "SIAGA" || kondisiHujan === "HUJAN DERAS") return "SIAGA";
     return "AMAN";
   };
 
@@ -107,8 +104,9 @@ export default function DashboardKelurahan() {
 
       prevStatusRef.current = statusBaru;
 
+      // Publish Alarm Virtual berdasarkan Status Tertinggi (BAHAYA)
       if (client && isConnected) {
-        if (statusBaru === "DARURAT" || statusBaru === "BAHAYA") {
+        if (statusBaru === "BAHAYA") {
           client.publish("project-banjir/node3/alarm", "ON");
         } else {
           client.publish("project-banjir/node3/alarm", "OFF");
@@ -125,6 +123,7 @@ export default function DashboardKelurahan() {
     isConnected,
   ]);
 
+  // --- Koneksi & Subscribe Topik MQTT Sesuai Ketentuan ---
   useEffect(() => {
     const mqttClient = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
       clientId: `web-posko-${Math.random().toString(16).slice(3)}`,
@@ -207,18 +206,10 @@ export default function DashboardKelurahan() {
         };
       case "BAHAYA":
         return {
-          cardBg: "bg-gradient-to-br from-orange-500 to-red-500",
-          shadow: "shadow-[0_15px_40px_rgba(249,115,22,0.4)]",
-          icon: (
-            <ShieldAlert className="w-10 h-10 md:w-12 md:h-12 text-white drop-shadow-md" />
-          ),
-        };
-      case "DARURAT":
-        return {
-          cardBg: "bg-gradient-to-br from-red-600 to-rose-700",
+          cardBg: "bg-gradient-to-br from-red-500 to-rose-600",
           shadow: "shadow-[0_15px_40px_rgba(225,29,72,0.5)] animate-pulse",
           icon: (
-            <Activity className="w-10 h-10 md:w-12 md:h-12 text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]" />
+            <ShieldAlert className="w-10 h-10 md:w-12 md:h-12 text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]" />
           ),
         };
       default:
@@ -251,10 +242,10 @@ export default function DashboardKelurahan() {
             </div>
             <div>
               <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight drop-shadow-sm">
-                Posko Wilayah
+                Posko Wilayah Kelurahan
               </h1>
               <p className="text-[10px] md:text-xs font-bold text-blue-500 uppercase tracking-widest">
-                Smart Flood Control
+                Smart Flood Monitoring Dashboard
               </p>
             </div>
           </div>
@@ -266,12 +257,12 @@ export default function DashboardKelurahan() {
               className={`w-4 h-4 md:w-5 md:h-5 ${isConnected ? "animate-pulse text-emerald-500" : "text-rose-500"}`}
             />
             <span className="drop-shadow-sm">
-              {isConnected ? "Sistem Online" : "Menghubungkan..."}
+              {isConnected ? "Sistem Terhubung" : "Menghubungkan..."}
             </span>
           </div>
         </header>
 
-        {/* --- Hero Banner 3D (Teks Diperkecil & Proporsional) --- */}
+        {/* --- Hero Banner 3D --- */}
         <section
           className={`relative flex flex-col md:flex-row justify-between items-center p-6 md:p-10 rounded-3xl md:rounded-[2.5rem] border border-white/40 transition-all duration-700 ${currentVisual.cardBg} ${currentVisual.shadow}`}
         >
@@ -291,17 +282,17 @@ export default function DashboardKelurahan() {
             </div>
           </div>
 
-          {statusWilayah === "DARURAT" && (
+          {statusWilayah === "BAHAYA" && (
             <div className="mt-6 md:mt-0 px-6 py-3 md:px-8 md:py-4 bg-white text-red-600 rounded-xl md:rounded-2xl font-black text-sm md:text-lg flex items-center gap-2 md:gap-3 shadow-[0_15px_30px_rgba(0,0,0,0.2)] border-b-4 border-slate-200 transform hover:scale-105 transition-transform cursor-pointer relative z-10">
               <BellRing className="w-5 h-5 md:w-7 md:h-7 animate-bounce" />
-              EVAKUASI WARGA SEKARANG!
+              STATUS BAHAYA - EVAKUASI!
             </div>
           )}
         </section>
 
         {/* --- Grid Cards 3D --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-          {/* Card Node 1 */}
+          {/* Card Node 1: Hulu Sungai */}
           <div className="bg-white/80 backdrop-blur-xl p-6 md:p-8 rounded-3xl md:rounded-[2rem] shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] border border-white hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.1)] hover:-translate-y-1 md:hover:-translate-y-2 transition-all duration-300">
             <div className="flex justify-between items-center mb-6 md:mb-8">
               <div className="flex items-center gap-3">
@@ -320,7 +311,7 @@ export default function DashboardKelurahan() {
             <div className="space-y-4 md:space-y-6">
               <div className="bg-slate-50 p-4 md:p-5 rounded-2xl shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] border border-slate-100">
                 <p className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-1">
-                  Level Permukaan
+                  Sensor Jarak (HC-SR04)
                 </p>
                 <div className="flex items-baseline gap-2">
                   <p className="text-4xl md:text-5xl font-black text-slate-800 drop-shadow-sm">
@@ -333,7 +324,7 @@ export default function DashboardKelurahan() {
               </div>
               <div>
                 <p className="text-slate-400 text-[9px] md:text-[10px] font-bold uppercase tracking-widest mb-1 md:mb-2 ml-1">
-                  Status Sensor
+                  Status Sensor Hulu
                 </p>
                 <div
                   className={`px-4 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm border shadow-sm inline-flex items-center justify-center w-full ${nodeSungai.status === "BAHAYA" ? "bg-red-50 text-red-600 border-red-200" : "bg-white text-slate-700 border-slate-200"}`}
@@ -344,7 +335,7 @@ export default function DashboardKelurahan() {
             </div>
           </div>
 
-          {/* Card Node 2 (Diperbarui dengan Level Air & Status) */}
+          {/* Card Node 2: Pintu Air */}
           <div className="bg-white/80 backdrop-blur-xl p-6 md:p-8 rounded-3xl md:rounded-[2rem] shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] border border-white hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.1)] hover:-translate-y-1 md:hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-center mb-6 md:mb-8">
@@ -361,11 +352,10 @@ export default function DashboardKelurahan() {
                 </span>
               </div>
 
-              {/* Grid 2 Kolom untuk Bukaan & Level Lokal */}
               <div className="grid grid-cols-2 gap-3 md:gap-4 mb-3 md:mb-4">
                 <div className="bg-slate-50 p-3 md:p-4 rounded-xl md:rounded-2xl shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] border border-slate-100 text-center">
                   <p className="text-slate-400 text-[9px] md:text-[10px] font-bold uppercase tracking-widest mb-1">
-                    Bukaan
+                    Bukaan Pintu
                   </p>
                   <p className="text-2xl md:text-3xl font-black text-indigo-600 drop-shadow-sm">
                     {nodePintuAir.bukaan}%
@@ -384,10 +374,9 @@ export default function DashboardKelurahan() {
                 </div>
               </div>
 
-              {/* Status Sensor Node 2 */}
               <div className="mb-2">
                 <div
-                  className={`px-4 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm border shadow-sm inline-flex items-center justify-center w-full ${nodePintuAir.status === "BAHAYA" ? "bg-red-50 text-red-600 border-red-200" : "bg-white text-slate-700 border-slate-200"}`}
+                  className={`px-4 py-1 md:py-2.5 rounded-xl font-bold text-xs md:text-sm border shadow-sm inline-flex items-center justify-center w-full ${nodePintuAir.status === "BAHAYA" ? "bg-red-50 text-red-600 border-red-200" : "bg-white text-slate-700 border-slate-200"}`}
                 >
                   Status Lokal: {nodePintuAir.status}
                 </div>
@@ -396,7 +385,7 @@ export default function DashboardKelurahan() {
 
             <div className="bg-slate-100/50 p-3 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 mt-4 md:mt-6 shadow-inner">
               <p className="text-[9px] md:text-[10px] font-black text-slate-400 mb-2 md:mb-3 uppercase text-center tracking-widest">
-                Kendali Aktuator 3D
+                Kontrol Aktuator
               </p>
               <div className="grid grid-cols-3 gap-2 md:gap-3">
                 <button
@@ -421,7 +410,7 @@ export default function DashboardKelurahan() {
             </div>
           </div>
 
-          {/* Card Node 3 */}
+          {/* Card Node 3: Posko Lokal */}
           <div className="bg-white/80 backdrop-blur-xl p-6 md:p-8 rounded-3xl md:rounded-[2rem] shadow-[0_15px_35px_-5px_rgba(0,0,0,0.05)] border border-white hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.1)] hover:-translate-y-1 md:hover:-translate-y-2 transition-all duration-300 flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-center mb-6 md:mb-8">
@@ -440,7 +429,7 @@ export default function DashboardKelurahan() {
 
               <div className="bg-slate-50 p-4 md:p-5 rounded-2xl shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] border border-slate-100 mb-5 md:mb-6 text-center">
                 <p className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-widest mb-2 md:mb-3">
-                  Sensor Cuaca
+                  Deteksi Cuaca (Rain Sensor)
                 </p>
                 <span className="text-xl md:text-2xl font-black text-slate-700 drop-shadow-sm">
                   {hujanLokal}
@@ -449,24 +438,22 @@ export default function DashboardKelurahan() {
             </div>
 
             <div
-              className={`p-4 md:p-5 rounded-2xl shadow-inner border flex items-center justify-between transition-colors duration-500 ${statusWilayah === "DARURAT" || statusWilayah === "BAHAYA" ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"}`}
+              className={`p-4 md:p-5 rounded-2xl shadow-inner border flex items-center justify-between transition-colors duration-500 ${statusWilayah === "BAHAYA" ? "bg-red-50 border-red-200" : "bg-slate-50 border-slate-200"}`}
             >
               <div>
                 <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-1 text-slate-400">
-                  Buzzer Warga
+                  Alarm Virtual (MQTT)
                 </p>
                 <p
-                  className={`text-sm md:text-base font-black ${statusWilayah === "DARURAT" || statusWilayah === "BAHAYA" ? "text-red-600" : "text-slate-600"}`}
+                  className={`text-sm md:text-base font-black ${statusWilayah === "BAHAYA" ? "text-red-600" : "text-slate-600"}`}
                 >
-                  {statusWilayah === "DARURAT" || statusWilayah === "BAHAYA"
-                    ? "Sinyal 'ON'"
-                    : "Sinyal 'OFF'"}
+                  {statusWilayah === "BAHAYA" ? "Sinyal 'ON'" : "Sinyal 'OFF'"}
                 </p>
               </div>
               <div
-                className={`p-2.5 md:p-3 rounded-xl shadow-sm ${statusWilayah === "DARURAT" || statusWilayah === "BAHAYA" ? "bg-red-500 text-white animate-pulse" : "bg-white text-slate-300"}`}
+                className={`p-2.5 md:p-3 rounded-xl shadow-sm ${statusWilayah === "BAHAYA" ? "bg-red-500 text-white animate-pulse" : "bg-white text-slate-300"}`}
               >
-                {statusWilayah === "DARURAT" || statusWilayah === "BAHAYA" ? (
+                {statusWilayah === "BAHAYA" ? (
                   <BellRing className="w-5 h-5 md:w-6 md:h-6" />
                 ) : (
                   <BellOff className="w-5 h-5 md:w-6 md:h-6" />
